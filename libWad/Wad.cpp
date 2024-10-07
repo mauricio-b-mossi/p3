@@ -433,13 +433,95 @@ void Wad::createDirectory(const string &path){
         FileIO::writeAtLocation(this->path, effectiveOffset, startFd.toString());
         FileIO::writeAtLocation(this->path, effectiveOffset + 16, endFd.toString());
     }
-
-
-    // valid insertion. Search position insert 32 bytes.
 }
 
 void Wad::createFile(const string &path){
-    return;
+    if(path.back() == '/'){
+        return;
+    }
+
+    if(!isAbsolutePathAndNotEmpty(path)){
+        return;
+    }
+
+    FsObj* pathItem = getPathItem(path);
+    
+    if(pathItem != nullptr){ // File already exists
+        return;
+    }
+
+    // File does not exist. Check if length of path >= 2 (/<file>)
+    vector<string> parsedPath = parsePath(path);
+
+    if(parsedPath.size() < 2){ // just contains "/"
+        return;
+    }
+
+    string fileName = parsedPath.back();
+
+    if(fileName.length() > 8){ // name does not fit 8 char constraint.
+        return;
+    }
+
+    // check if parent valid, exists and not map or file.
+    size_t pos = path.rfind(fileName);
+
+    string parent;
+
+    if (pos != std::string::npos) {
+        parent = normalizePath(path.substr(0, pos));
+    }
+
+    if(parent.empty()){
+        return;
+    }
+
+    pathItem = getPathItem(parent);
+
+    if(pathItem == nullptr){
+        return;
+    }
+
+    // Insert either on "/" or namespace.
+    if(pathItem->getName() == "/")
+    {
+        this->descriptorListLength += 1;
+
+        ostringstream oss;
+        
+        oss.write(reinterpret_cast<const char*>(&this->descriptorListLength), sizeof(this->descriptorListLength));
+
+        string result = oss.str();
+
+        FileIO::writeAtLocation(this->path, 4, result);
+
+        FileDescriptor fileFd;
+
+        fileFd.createFileDescriptor(0, 0, fileName);
+
+        FileIO::append(this->path, fileFd.toString());
+    }
+    else if(pathItem->isNamespaceDirectory())
+    {
+        this->descriptorListLength += 1;
+
+        ostringstream oss;
+        
+        oss.write(reinterpret_cast<const char*>(&this->descriptorListLength), sizeof(this->descriptorListLength));
+
+        string result = oss.str();
+
+        FileIO::writeAtLocation(this->path, 4, result);
+
+        FileDescriptor fileFd;
+
+        fileFd.createFileDescriptor(0, 0, fileName);
+
+        auto effectiveOffset = pathItem->getEnd() * 16 + this->descriptorListOffset;
+
+        FileIO::shift(this->path, effectiveOffset, 16);
+        FileIO::writeAtLocation(this->path, effectiveOffset, fileFd.toString());
+    }
 }
 
 int Wad::writeToFile(const string &path, const char *buffer, int length, int offset = 0){
