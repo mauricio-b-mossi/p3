@@ -10,6 +10,7 @@ using namespace std;
 class FsObj{
 
     string name;
+    string fullname;
     vector<FsObj*> children;
     int offset;
     int length;
@@ -18,7 +19,8 @@ class FsObj{
 
     public:
         FsObj();
-        FsObj(const string &name, int offset, int length, int pos);
+        FsObj(const string &name, const string &fullname, int offset, int length, int pos);
+        bool isDirectory();
         void setEnd(int _end); // Points to the end of namespace.
         void appendChild(FsObj* child);
         bool isMapDirectory();
@@ -29,6 +31,7 @@ class FsObj{
         int getEnd();
         int getOffset();
         string getName();
+        string getFullName();
         //string getContent();
         vector<string> getChildrenNames();
         vector<FsObj*> getChildren();

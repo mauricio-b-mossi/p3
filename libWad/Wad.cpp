@@ -50,7 +50,7 @@ Wad::Wad(const string &path) : path{path}{
     this->descriptorListLength = descriptorsListLength;
 
     stack<FsObj*> directoryStucture;
-    FsObj* root = new FsObj("/", 0, 0, 0);
+    FsObj* root = new FsObj("/", "/", 0, 0, 0);
     directoryStucture.push(root);
 
     for (int i = 0; i < descriptorsListLength; i++) {
@@ -69,18 +69,18 @@ Wad::Wad(const string &path) : path{path}{
 
         delete[] nameBuffer;
 
-        if (regex_search(elementName, Wad::namespaceStartPattern)) // Starting namespace case.
+        if (regex_search(regexCompat, Wad::namespaceStartPattern)) // Starting namespace case.
         {
             auto markerStart = elementName.find("_START"); // I know this wont fail by regex.
             auto namespaceDirectoryName = elementName.substr(0, markerStart);
-            FsObj* namespaceDirectory = new FsObj(namespaceDirectoryName, elementOffset, elementLength, i);
+            FsObj* namespaceDirectory = new FsObj(namespaceDirectoryName, elementName, elementOffset, elementLength, i);
 
             directoryStucture.top()->appendChild(namespaceDirectory);
             directoryStucture.push(namespaceDirectory);
 
         }
 
-        else if (regex_search(elementName, Wad::namespaceEndPattern)) // Closing namespace case.
+        else if (regex_search(regexCompat, Wad::namespaceEndPattern)) // Closing namespace case.
         {
             directoryStucture.top()->setEnd(i);
             directoryStucture.pop();
@@ -88,14 +88,14 @@ Wad::Wad(const string &path) : path{path}{
 
         else if(regex_match(regexCompat, Wad::mapPattern)) // Matching regex ensures name is proper map directory.
         {
-            FsObj* mapDirectory = new FsObj(elementName, elementOffset, elementLength, i);
+            FsObj* mapDirectory = new FsObj(regexCompat, elementName, elementOffset, elementLength, i);
             directoryStucture.top()->appendChild(mapDirectory);
             directoryStucture.push(mapDirectory);
         }
 
         else // If not any of the above, then it is file, might be file of length 0.
         {
-            FsObj* newFile = new FsObj(elementName, elementOffset, elementLength, i);
+            FsObj* newFile = new FsObj(regexCompat, elementName, elementOffset, elementLength, i);
 
             directoryStucture.top()->appendChild(newFile);
 
@@ -116,6 +116,7 @@ Wad* Wad::loadWad(const string &path) {
     return new Wad(path);
 }
 
+// FIXME
 void Wad::reloadWad(){
     if(this->root == nullptr){
         return;
@@ -155,42 +156,46 @@ void Wad::reloadWad(){
         file.read((char*)&elementLength, 4);
         file.read(nameBuffer, 8);
         string elementName(nameBuffer, 8);
+
+        string regexCompat(nameBuffer); // Regex do nto work with elementName due to sizing.
+
         delete[] nameBuffer;
 
-        if (directoryStucture.top()->isMapDirectory() && directoryStucture.top()->getNumChildren() == 10) { 
-            directoryStucture.pop();
-        }
-
-        if (regex_search(elementName, Wad::namespaceStartPattern)) // Starting namespace case.
+        if (regex_search(regexCompat, Wad::namespaceStartPattern)) // Starting namespace case.
         {
             auto markerStart = elementName.find("_START"); // I know this wont fail by regex.
             auto namespaceDirectoryName = elementName.substr(0, markerStart);
-            FsObj* namespaceDirectory = new FsObj(namespaceDirectoryName, elementOffset, elementLength, i);
+            FsObj* namespaceDirectory = new FsObj(namespaceDirectoryName, elementName, elementOffset, elementLength, i);
 
             directoryStucture.top()->appendChild(namespaceDirectory);
             directoryStucture.push(namespaceDirectory);
 
         }
 
-        else if (regex_search(elementName, Wad::namespaceEndPattern)) // Closing namespace case.
+        else if (regex_search(regexCompat, Wad::namespaceEndPattern)) // Closing namespace case.
         {
             directoryStucture.top()->setEnd(i);
             directoryStucture.pop();
         }
 
-        else if(regex_match(elementName, Wad::mapPattern)) // Matching regex ensures name is proper map directory.
+        else if(regex_match(regexCompat, Wad::mapPattern)) // Matching regex ensures name is proper map directory.
         {
-            FsObj* mapDirectory = new FsObj(elementName, elementOffset, elementLength, i);
+            FsObj* mapDirectory = new FsObj(regexCompat, elementName, elementOffset, elementLength, i);
             directoryStucture.top()->appendChild(mapDirectory);
             directoryStucture.push(mapDirectory);
         }
 
         else // If not any of the above, then it is file, might be file of length 0.
         {
-            FsObj* newFile = new FsObj(elementName, elementOffset, elementLength, i);
+            FsObj* newFile = new FsObj(regexCompat, elementName, elementOffset, elementLength, i);
 
             directoryStucture.top()->appendChild(newFile);
+
+            if(directoryStucture.top()->getNumChildren() == 10){
+                directoryStucture.pop();
+            }
         }
+
     }
 
     file.close();
@@ -235,9 +240,9 @@ string Wad::getMagic() {
 }
 
 bool Wad::isDirectoryFromName(const string &name){
-    cout << "Entered is Directory from name" << endl;
     return regex_match(name, Wad::mapPattern) || regex_search(name, Wad::namespaceStartPattern) || regex_search(name, Wad::namespaceEndPattern);
 }
+
 
 bool Wad::isDirectory(const string &path) {
     if(!isAbsolutePathAndNotEmpty(path)){
@@ -249,25 +254,22 @@ bool Wad::isDirectory(const string &path) {
         return false;
     }
 
-    return this->isDirectoryFromName(pathItem->getName());
+    return pathItem->isDirectory();
 }
 
 bool Wad::isContent(const string &path) {
     this->root->traverse(true);
-    cout << "PATH ========"<< path << endl;
     if(!isAbsolutePathAndNotEmpty(path)){
-        cout << "Not abs or empty" << endl;
         return false;
     }
 
     FsObj* pathItem = getPathItem(normalizePath(path));
 
     if(pathItem == nullptr){
-        cout << "pathItem not found" << endl;
         return false;
     }
 
-    return !this->isDirectoryFromName(pathItem->getName());
+    return !pathItem->isDirectory();
 }
 
 
@@ -282,7 +284,7 @@ int Wad::getSize(const string &path) {
         return -1;
     }
 
-    if(this->isDirectoryFromName(pathItem->getName())){
+    if(pathItem->isDirectory()){
         return -1;
     }
 
@@ -301,7 +303,7 @@ int Wad::getContents(const string &path, char *buffer, int length, int offset) {
         return -1;
     }
 
-    if(this->isDirectoryFromName(pathItem->getName())){
+    if(pathItem->isDirectory()){
         return -1;
     }
 
@@ -350,7 +352,7 @@ int Wad::getDirectory(const string &path, vector<string> *directory) {
        return -1; 
     } 
 
-    if(!this->isDirectoryFromName(pathItem->getName())){
+    if(!pathItem->isDirectory()){
         return -1;
     }
 
@@ -673,7 +675,7 @@ FsObj* Wad::getPathItem(const string &path) {
 FsObj::FsObj() : name{""}, offset{0}, length{0}, pos{0}, _end{-1} {}
 
 
-FsObj::FsObj(const string &name, int offset, int length, int pos) : name{name}, offset{offset}, length{length}, pos{pos}, _end{-1} {}
+FsObj::FsObj(const string &name, const string &fullname, int offset, int length, int pos) : name{name}, fullname{fullname}, offset{offset}, length{length}, pos{pos}, _end{-1} {}
 
 void FsObj::clear(){
     if(this->children.empty()){
@@ -691,6 +693,11 @@ void FsObj::appendChild(FsObj* child) {
 
 // Regex: match, matches the whole char seq, search, matches any part of the char seq.
 
+bool FsObj::isDirectory()
+{
+    return regex_match(this->getName(), Wad::mapPattern) || regex_search(this->getName(), Wad::namespaceStartPattern) || regex_search(this->getName(), Wad::namespaceEndPattern) || regex_match(this->getFullName(), Wad::mapPattern) || regex_search(this->getFullName(), Wad::namespaceStartPattern) || regex_search(this->getFullName(), Wad::namespaceEndPattern) || this->getName() == "/" || this->getFullName() == "/";
+}
+
 bool FsObj::isMapDirectory() {
     return regex_match(this->name, Wad::mapPattern);
 }
@@ -706,6 +713,11 @@ int FsObj::getNumChildren() {
 
 int FsObj::getLength(){
     return this->length;
+}
+
+string FsObj::getFullName()
+{
+    return this->fullname;
 }
 
 string FsObj::getName() {
@@ -859,3 +871,4 @@ bool FileDescriptor::createFileDescriptor(unsigned int elementOffset, unsigned i
     std::strncpy(this->nameBuffer, name.c_str(), name.size());
     return true;
 }
+
