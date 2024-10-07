@@ -315,10 +315,16 @@ int Wad::getContents(const string &path, char *buffer, int length, int offset) {
         length = pathItem->getLength();
     }
 
+    cout << "Path: " << path << " Offset: " << pathItem->getOffset() << " Length: " << pathItem->getLength() << endl;
+
     ifstream file(this->path, ios::binary);
     file.seekg(pathItem->getOffset() + offset, ios_base::beg);
 
-    auto effectiveLength = pathItem->getLength() - offset;
+    auto effectiveLength = length;
+
+    if(offset + length > pathItem->getLength()){
+        effectiveLength = pathItem->getLength() - offset;
+    }
 
     char* contentBuffer = new char[effectiveLength];
     file.read(contentBuffer, effectiveLength);
