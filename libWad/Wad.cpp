@@ -109,6 +109,9 @@ Wad::Wad(const string &path) : path{path}{
     this->root = root;
 
     file.close();
+
+    cout << "Load =========" << endl;
+    this->root->traverse(true);
 } 
 
 // Could cause errors.
@@ -200,6 +203,8 @@ void Wad::reloadWad(){
     }
 
     file.close();
+    cout << "Reload =========" << endl;
+    this->root->traverse(true);
 }
 
 vector<string> Wad::parsePath(const string& path) {
@@ -400,9 +405,6 @@ void Wad::createDirectory(const string &path){
         parent = normalizePath(path.substr(0, pos));
     }
 
-    cout << "parent: ===================" << parent << endl;
-    this->root->traverse(true);
-
     if(parent.empty()){
         return;
     }
@@ -436,8 +438,6 @@ void Wad::createDirectory(const string &path){
         FileIO::append(this->path, endFd.toString());
 
         this->reloadWad();
-        cout << "\n\n if slash '/'" << endl;
-        this->root->traverse(true);
     }
     else if(pathItem->isNamespaceDirectory())
     {
@@ -464,8 +464,6 @@ void Wad::createDirectory(const string &path){
         FileIO::writeAtLocation(this->path, effectiveOffset + 16, endFd.toString());
 
         this->reloadWad();
-        cout << "\n\n if _START" << endl;
-        this->root->traverse(true);
     }
 }
 
@@ -870,7 +868,7 @@ string FileDescriptor::toString() const {
     // Ensure that the string is exactly 16 bytes
     string result = oss.str();
     if (result.size() != 16) {
-        result.resize(16, '\0');  // Pad with null characters if necessary
+        result.resize(16, '\0');  
     }
     
     return result;
