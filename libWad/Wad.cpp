@@ -713,11 +713,11 @@ bool FsObj::isDirectory()
 }
 
 bool FsObj::isMapDirectory() {
-    return regex_match(this->name, Wad::mapPattern);
+    return regex_match(this->name, Wad::mapPattern) || regex_match(this->fullname, Wad::mapPattern);
 }
 
 bool  FsObj::isNamespaceDirectory(){
-    return regex_search(this->name, Wad::namespaceStartPattern);
+    return regex_search(this->name, Wad::namespaceStartPattern) || regex_search(this->fullname, Wad::namespaceStartPattern);
 }
 
 
