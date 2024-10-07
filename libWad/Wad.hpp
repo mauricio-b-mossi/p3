@@ -66,3 +66,14 @@ class Wad {
         void createFile(const string &path);
         int writeToFile(const string &path, const char *buffer, int length, int offset);
 };
+
+struct FileIO{
+    static void shift(const string& filename, streamoff offset, streamoff shiftAmount);
+
+    static void append(const string &filename, const string &data);
+
+    static void write(const string &filename, const string &data);
+
+    static void writeAtLocation(const string& filename, streamoff offset, const string& data);
+
+}

@@ -444,3 +444,95 @@ vector<string> FsObj::getChildrenNames() {
 vector<FsObj*> FsObj::getChildren() {
     return this->children;
 }
+
+void FileIO::shift(const string& filename, streamoff offset, streamoff shiftAmount) {
+    fstream file(filename, ios::in | ios::out | ios::binary);
+
+    if (!file.is_open()) {
+        throw runtime_error("Unable to open file");
+    }
+
+    // Move to the specified offset
+    file.seekg(offset, ios::beg);
+
+    // Read the rest of the file into a buffer
+    vector<char> buffer;
+    file.seekg(0, ios::end);
+    streamoff fileSize = file.tellg();
+    if (offset >= fileSize) {
+        cout << "Offset is beyond the end of the file." << endl; // Append to the end.
+        return;
+    }
+
+    streamoff readSize = fileSize - offset;
+    buffer.resize(readSize);
+
+    file.seekg(offset, ios::beg);
+    file.read(buffer.data(), readSize);
+
+    // Ensure the write location is correct
+    file.seekp(offset + shiftAmount, ios::beg);
+
+    // Write the buffer back to the file shifted by the amount
+    file.write(buffer.data(), buffer.size());
+
+    // Adjust the file size to account for the shift
+    file.close();
+    fstream truncateFile(filename, ios::in | ios::out | ios::binary);
+    truncateFile.seekp(offset + shiftAmount + buffer.size(), ios::beg);
+    truncateFile.close();
+}
+
+void FileIO::append(const string &filename, const string &data){
+    ofstream file(filename, ios::app);
+
+    if (!file.is_open()) {
+        throw runtime_error("Unable to open file");
+    }
+
+    file << data;
+
+    file.close();
+    
+    cout << "Data added" << endl;
+}
+
+void FileIO::write(const string &filename, const string &data){
+    ofstream file(filename);
+
+    if (!file.is_open()) {
+        throw runtime_error("Unable to open file");
+    }
+
+
+    file << data;
+
+    file.close();
+    
+    cout << "Data added" << endl;
+}
+
+void FileIO::writeAtLocation(const string& filename, streamoff offset, const string& data) {
+
+    fstream file(filename, ios::in | ios::out | ios::binary);
+
+    if (!file.is_open()) {
+        throw runtime_error("Unable to open file");
+    }
+    
+
+    file.seekp(offset, ios::beg);
+    
+    if (!file.good()) {
+        file.close();
+        throw runtime_error("Failed to seek to the specified position.");
+    }
+
+    file.write(data.c_str(), data.size());
+
+    if (!file.good()) {
+        throw runtime_error("Failed to write data to the file.");
+    }
+
+    file.close();
+}
