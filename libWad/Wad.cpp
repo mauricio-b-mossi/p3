@@ -1,4 +1,4 @@
-#include "Wad.hpp"
+#include "Wad.h"
 #include <stack>
 #include <iostream>
 #include <fstream>
