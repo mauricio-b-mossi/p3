@@ -18,7 +18,7 @@ class FsObj{
 
     public:
         FsObj();
-        FsObj(string name, int offset, int length, int pos, int _end);
+        FsObj(const string &name, int offset, int length, int pos);
         void setEnd(int _end); // Points to the end of namespace.
         void appendChild(FsObj* child);
         bool isMapDirectory();
@@ -76,4 +76,4 @@ struct FileIO{
 
     static void writeAtLocation(const string& filename, streamoff offset, const string& data);
 
-}
+};

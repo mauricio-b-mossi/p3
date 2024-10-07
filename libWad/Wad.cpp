@@ -370,7 +370,7 @@ FsObj* Wad::getPathItem(const string &path) {
 FsObj::FsObj() : name{""}, offset{0}, length{0}, pos{0}, _end{-1} {}
 
 
-FsObj::FsObj(string name, int offset, int length, int pos, int _end = -1) : name{name}, offset{offset}, length{length}, pos{pos}, _end{_end} {}
+FsObj::FsObj(const string &name, int offset, int length, int pos) : name{name}, offset{offset}, length{length}, pos{pos}, _end{-1} {}
 
 
 void FsObj::appendChild(FsObj* child) {
