@@ -15,7 +15,7 @@
 #include <regex>
 #include "gtest/gtest.h"
 
-#include "libWad/Wad.hp"
+#include "libWad/Wad.h"
 
 const std::string setupWorkspace(){
 
