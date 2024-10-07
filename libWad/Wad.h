@@ -96,5 +96,5 @@ struct FileDescriptor {
     bool createFileDescriptor(unsigned int elementOffset, unsigned int elementLength, const string &name);
 
     // Method to return the complete 16-byte string representation
-    std::string toString() const;
+    string toString() const;
 };

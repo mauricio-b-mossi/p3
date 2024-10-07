@@ -398,7 +398,7 @@ void Wad::createDirectory(const string &path){
 
     string parent;
 
-    if (pos != std::string::npos) {
+    if (pos != string::npos) {
         parent = normalizePath(path.substr(0, pos));
     }
 
@@ -500,7 +500,7 @@ void Wad::createFile(const string &path){
 
     string parent;
 
-    if (pos != std::string::npos) {
+    if (pos != string::npos) {
         parent = normalizePath(path.substr(0, pos));
     }
 
@@ -879,7 +879,7 @@ bool FileDescriptor::createFileDescriptor(unsigned int elementOffset, unsigned i
     }
     this->elementOffset = elementOffset;
     this->elementLength = elementLength;
-    std::strncpy(this->nameBuffer, name.c_str(), name.size());
+    strncpy(this->nameBuffer, name.c_str(), name.size());
     return true;
 }
 
