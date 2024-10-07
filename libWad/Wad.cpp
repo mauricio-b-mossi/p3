@@ -590,7 +590,7 @@ int Wad::writeToFile(const string &path, const char *buffer, int length, int off
     unsigned int newDescriptorListOffset = ulength + this->descriptorListOffset;
     oss.write(reinterpret_cast<const char*>(&newDescriptorListOffset), sizeof(newDescriptorListOffset));
 
-    string result = oss.str();
+    result = oss.str();
 
     // Now change header
     FileIO::writeAtLocation(this->path, 8, result);
