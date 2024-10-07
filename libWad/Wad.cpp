@@ -99,6 +99,91 @@ Wad::Wad(const string &path) : path{path}{
     file.close();
 } 
 
+// Could cause errors.
+Wad* Wad::loadWad(const string &path) {
+    return new Wad(path);
+}
+
+void Wad::reloadWad(){
+    if(this->root == nullptr){
+        return;
+    }
+
+    this->root->clear();
+
+    ifstream file(this->path, ios::binary);
+
+    if (!file.is_open()){
+     throw runtime_error("Unable to open file");
+    }
+
+    char* magic = new char[4];
+    unsigned int descriptorsListLength;
+    unsigned int descriptorListOffset;
+
+    file.read(magic, 4);
+    file.read((char*)&descriptorsListLength, 4);
+    file.read((char*)&descriptorListOffset, 4);
+
+    this->magic = string(magic, 4);
+    this->descriptorListOffset = descriptorListOffset;
+    this->descriptorListLength = descriptorsListLength;
+
+    stack<FsObj*> directoryStucture;
+    directoryStucture.push(this->root);
+
+    for (int i = 0; i < descriptorsListLength; i++) {
+
+        file.seekg(descriptorListOffset + i * 16, ios_base::beg); // Going to the ith item in the descriptor list.
+        unsigned int elementOffset;
+        unsigned int elementLength;
+        char* nameBuffer = new char[8];
+
+        file.read((char*)&elementOffset, 4);
+        file.read((char*)&elementLength, 4);
+        file.read(nameBuffer, 8);
+        string elementName(nameBuffer, 8);
+        delete[] nameBuffer;
+
+        if (directoryStucture.top()->isMapDirectory() && directoryStucture.top()->getNumChildren() == 10) { 
+            directoryStucture.pop();
+        }
+
+        if (regex_search(elementName, Wad::namespaceStartPattern)) // Starting namespace case.
+        {
+            auto markerStart = elementName.find("_START"); // I know this wont fail by regex.
+            auto namespaceDirectoryName = elementName.substr(0, markerStart);
+            FsObj* namespaceDirectory = new FsObj(namespaceDirectoryName, elementOffset, elementLength, i);
+
+            directoryStucture.top()->appendChild(namespaceDirectory);
+            directoryStucture.push(namespaceDirectory);
+
+        }
+
+        else if (regex_search(elementName, Wad::namespaceEndPattern)) // Closing namespace case.
+        {
+            directoryStucture.top()->setEnd(i);
+            directoryStucture.pop();
+        }
+
+        else if(regex_match(elementName, Wad::mapPattern)) // Matching regex ensures name is proper map directory.
+        {
+            FsObj* mapDirectory = new FsObj(elementName, elementOffset, elementLength, i);
+            directoryStucture.top()->appendChild(mapDirectory);
+            directoryStucture.push(mapDirectory);
+        }
+
+        else // If not any of the above, then it is file, might be file of length 0.
+        {
+            FsObj* newFile = new FsObj(elementName, elementOffset, elementLength, i);
+
+            directoryStucture.top()->appendChild(newFile);
+        }
+    }
+
+    file.close();
+}
+
 vector<string> Wad::parsePath(const string& path) {
     vector<string> parts;
     stringstream ss(path);
@@ -130,11 +215,6 @@ string Wad::normalizePath(const string &path) // Normalizes path by removing tra
 bool Wad::isAbsolutePathAndNotEmpty(const string &path)
 {
     return path.size() > 0 && path.at(0) == '/';
-}
-
-// Could cause errors.
-Wad* Wad::loadWad(const string &path) {
-    return new Wad(path);
 }
 
 
@@ -328,6 +408,7 @@ int Wad::writeToFile(const string &path, const char *buffer, int length, int off
     return 0;
 }
 
+
 FsObj* Wad::getPathItem(const string &path) {
     vector<string> pathItemNames;
     stringstream ss(path);
@@ -372,6 +453,15 @@ FsObj::FsObj() : name{""}, offset{0}, length{0}, pos{0}, _end{-1} {}
 
 FsObj::FsObj(const string &name, int offset, int length, int pos) : name{name}, offset{offset}, length{length}, pos{pos}, _end{-1} {}
 
+void FsObj::clear(){
+    if(this->children.empty()){
+        return;
+    }
+    for(auto child : this->children){
+        child->clear();
+        delete child;
+    }
+}
 
 void FsObj::appendChild(FsObj* child) {
     this->children.push_back(child);
@@ -397,23 +487,9 @@ string FsObj::getName() {
     return this->name;
 }
 
-
- //string FsObj::getContent() {
-     //ifstream file(Wad::path, ios::binary);
-     //file.seekg(this->offset, ios_base::beg);
-     //char* contentBuffer = new char[this->length];
-     //file.read(contentBuffer, this->length);
- //
-     //stringstream ss;
- //
-     //for (int i = 0; i < this->length; i++) {
-         //ss << contentBuffer[i];
-     //}
- //
-     //delete[] contentBuffer;
- //
-     //return ss.str();
- //}
+int FsObj::getEnd(){
+    return this->_end;
+}
 
 int FsObj::getOffset(){
     return this->offset;
@@ -535,4 +611,33 @@ void FileIO::writeAtLocation(const string& filename, streamoff offset, const str
     }
 
     file.close();
+}
+
+string FileDescriptor::toString() const {
+    ostringstream oss;
+    
+    // Writing the elementOffset (4 bytes) and elementLength (4 bytes)
+    oss.write(reinterpret_cast<const char*>(&elementOffset), sizeof(elementOffset));
+    oss.write(reinterpret_cast<const char*>(&elementLength), sizeof(elementLength));
+    
+    // Writing the nameBuffer (8 bytes), ensuring exactly 8 characters
+    oss.write(nameBuffer, sizeof(nameBuffer));
+    
+    // Ensure that the string is exactly 16 bytes
+    string result = oss.str();
+    if (result.size() != 16) {
+        result.resize(16, '\0');  // Pad with null characters if necessary
+    }
+    
+    return result;
+}
+
+bool FileDescriptor::createFileDescriptor(unsigned int elementOffset, unsigned int elementLength, const string &name){
+    if(name.size() > 8){
+        return false;
+    }
+    this->elementOffset = elementOffset;
+    this->elementLength = elementLength;
+    std::strncpy(this->nameBuffer, name.c_str(), name.size());
+    return true;
 }

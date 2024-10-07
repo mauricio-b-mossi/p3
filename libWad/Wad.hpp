@@ -26,11 +26,13 @@ class FsObj{
         int getNumChildren();
         int getSize();
         int getPosition();
+        int getEnd();
         int getOffset();
         string getName();
         //string getContent();
         vector<string> getChildrenNames();
         vector<FsObj*> getChildren();
+        void clear();
 };
 
 class Wad {
@@ -39,7 +41,7 @@ class Wad {
     string path;
     unsigned int descriptorListOffset;
     unsigned int descriptorListLength;
-    FsObj* root;
+    FsObj* root = nullptr;
     FsObj* getPathItem(const string &path);
     bool isDirectoryFromName(const string &name);
     vector<string> parsePath(const string &path);
@@ -49,11 +51,14 @@ class Wad {
 
     public:
         Wad(const string &path);
+        ~Wad();
 
         static Wad* loadWad(const string &path);
         static regex mapPattern;
         static regex namespaceStartPattern;
         static regex namespaceEndPattern;
+
+        void reloadWad();
 
         string getMagic();
         bool isContent(const string &path);
@@ -75,5 +80,15 @@ struct FileIO{
     static void write(const string &filename, const string &data);
 
     static void writeAtLocation(const string& filename, streamoff offset, const string& data);
+};
 
+struct FileDescriptor {
+    unsigned int elementOffset;
+    unsigned int elementLength;
+    char nameBuffer[8]; // To hold the name exactly 8 bytes
+
+    bool createFileDescriptor(unsigned int elementOffset, unsigned int elementLength, const string &name);
+
+    // Method to return the complete 16-byte string representation
+    std::string toString() const;
 };
