@@ -123,6 +123,7 @@ void Wad::reloadWad(){
     }
 
     this->root->clear();
+    this->root->clearChildren();
 
     ifstream file(this->path, ios::binary);
 
@@ -258,7 +259,6 @@ bool Wad::isDirectory(const string &path) {
 }
 
 bool Wad::isContent(const string &path) {
-    this->root->traverse(true);
     if(!isAbsolutePathAndNotEmpty(path)){
         return false;
     }
@@ -314,8 +314,6 @@ int Wad::getContents(const string &path, char *buffer, int length, int offset) {
     if (length > pathItem->getLength()) {
         length = pathItem->getLength();
     }
-
-    cout << "Path: " << path << " Offset: " << pathItem->getOffset() << " Length: " << pathItem->getLength() << endl;
 
     ifstream file(this->path, ios::binary);
     file.seekg(pathItem->getOffset() + offset, ios_base::beg);
@@ -402,6 +400,9 @@ void Wad::createDirectory(const string &path){
         parent = normalizePath(path.substr(0, pos));
     }
 
+    cout << "parent: ===================" << parent << endl;
+    this->root->traverse(true);
+
     if(parent.empty()){
         return;
     }
@@ -435,6 +436,8 @@ void Wad::createDirectory(const string &path){
         FileIO::append(this->path, endFd.toString());
 
         this->reloadWad();
+        cout << "\n\n if slash '/'" << endl;
+        this->root->traverse(true);
     }
     else if(pathItem->isNamespaceDirectory())
     {
@@ -461,6 +464,8 @@ void Wad::createDirectory(const string &path){
         FileIO::writeAtLocation(this->path, effectiveOffset + 16, endFd.toString());
 
         this->reloadWad();
+        cout << "\n\n if _START" << endl;
+        this->root->traverse(true);
     }
 }
 
@@ -638,6 +643,9 @@ void FsObj::traverse(bool root, string prev){
     }
 }
 
+void FsObj::clearChildren(){
+    this->children.clear();
+}
 
 FsObj* Wad::getPathItem(const string &path) {
     vector<string> pathItemNames;

@@ -26,6 +26,7 @@ class FsObj{
         bool isMapDirectory();
         bool isNamespaceDirectory();
         int getNumChildren();
+        void clearChildren();
         int getLength();
         int getPosition();
         int getEnd();
