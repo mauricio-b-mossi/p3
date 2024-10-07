@@ -15,6 +15,7 @@ regex Wad::mapPattern("^E[0-9]M[0-9]$");
 
 // Even though advised against in video, I've decided to load fileContent into memory for simplicity.
 Wad::Wad(const string &path) : path{path}{
+
     ifstream file(path, ios::binary);
 
     /*
@@ -41,7 +42,7 @@ Wad::Wad(const string &path) : path{path}{
     this->descriptorListLength = descriptorsListLength;
 
     stack<FsObj*> directoryStucture;
-    FsObj* root = new FsObj();
+    FsObj* root = new FsObj("/", 0, 0, 0);
     directoryStucture.push(root);
 
     for (int i = 0; i < descriptorsListLength; i++) {
@@ -61,11 +62,11 @@ Wad::Wad(const string &path) : path{path}{
             directoryStucture.pop();
         }
 
-        else if (regex_search(elementName, Wad::namespaceStartPattern)) // Starting namespace case.
+        if (regex_search(elementName, Wad::namespaceStartPattern)) // Starting namespace case.
         {
             auto markerStart = elementName.find("_START"); // I know this wont fail by regex.
             auto namespaceDirectoryName = elementName.substr(0, markerStart);
-            FsObj* namespaceDirectory = new FsObj(namespaceDirectoryName, "");
+            FsObj* namespaceDirectory = new FsObj(namespaceDirectoryName, elementOffset, elementLength, i);
 
             directoryStucture.top()->appendChild(namespaceDirectory);
             directoryStucture.push(namespaceDirectory);
@@ -74,33 +75,20 @@ Wad::Wad(const string &path) : path{path}{
 
         else if (regex_search(elementName, Wad::namespaceEndPattern)) // Closing namespace case.
         {
+            directoryStucture.top()->setEnd(i);
             directoryStucture.pop();
         }
 
         else if(regex_match(elementName, Wad::mapPattern)) // Matching regex ensures name is proper map directory.
         {
-            FsObj* mapDirectory = new FsObj(elementName, "");
+            FsObj* mapDirectory = new FsObj(elementName, elementOffset, elementLength, i);
             directoryStucture.top()->appendChild(mapDirectory);
             directoryStucture.push(mapDirectory);
         }
 
         else // If not any of the above, then it is file, might be file of length 0.
         {
-            file.seekg(elementOffset, ios_base::beg);
-            char* contentBuffer = new char[elementLength];
-            file.read(contentBuffer, elementLength);
-
-            stringstream ss;
-
-            for (int i = 0; i < elementLength; i++) {
-                ss << contentBuffer[i];
-            }
-
-            delete[] contentBuffer;
-
-            auto fileContent = ss.str();
-
-            FsObj* newFile = new FsObj(elementName, fileContent);
+            FsObj* newFile = new FsObj(elementName, elementOffset, elementLength, i);
 
             directoryStucture.top()->appendChild(newFile);
         }
@@ -201,7 +189,7 @@ int Wad::getSize(const string &path) {
         return -1;
     }
 
-    return pathItem->getContent().length(); // If file of 0 length?
+    return pathItem->getSize(); // If file of 0 length?
 }
 
 
@@ -220,15 +208,31 @@ int Wad::getContents(const string &path, char *buffer, int length, int offset = 
         return -1;
     }
 
-    if(offset >= pathItem->getContent().length()){
+    if(offset >= pathItem->getSize()){
         return 0;
     }
 
-    if (length > pathItem->getContent().length()) {
-        length = pathItem->getContent().length();
+    if (length > pathItem->getSize()) {
+        length = pathItem->getSize();
     }
 
-    string content(pathItem->getContent(), offset, length);
+    ifstream file(this->path, ios::binary);
+    file.seekg(pathItem->getOffset() + offset, ios_base::beg);
+
+    auto effectiveLength = pathItem->getSize() - offset;
+
+    char* contentBuffer = new char[effectiveLength];
+    file.read(contentBuffer, effectiveLength);
+
+    stringstream ss;
+
+    for (int i = 0; i < effectiveLength; i++) {
+        ss << contentBuffer[i];
+    }
+
+    delete[] contentBuffer;
+
+    string content =  ss.str();
 
     for (int i = 0; i < content.size(); i++) {
         buffer[i] = content.at(i);
@@ -278,12 +282,13 @@ void Wad::createDirectory(const string &path){
         return;
     }
 
-    if(parsedPath.back().length() > 2){ // name does not fit 2 char constraint.
+    string directoryName = parsedPath.back();
+    if(directoryName.length() > 2){ // name does not fit 2 char constraint.
         return;
     }
 
     // check if parent valid, exists and not map or file.
-    size_t pos = path.rfind(parsedPath.back());
+    size_t pos = path.rfind(directoryName);
 
     string parent;
 
@@ -297,7 +302,20 @@ void Wad::createDirectory(const string &path){
 
     pathItem = getPathItem(parent);
 
-    if(pathItem )
+    if(pathItem == nullptr){
+        return;
+    }
+
+    // Insert either on "/" or namespace.
+    if(pathItem->getName() == "/")
+    {
+        //(pathItem->getChildren().back()->getPosition() + 1) * 16
+    }
+    else if(pathItem->isNamespaceDirectory())
+    {
+        // namespace.end
+    }
+
 
     // valid insertion. Search position insert 32 bytes.
 }
@@ -349,10 +367,10 @@ FsObj* Wad::getPathItem(const string &path) {
     return curr;
 }
 
-FsObj::FsObj() : name{""}, content{""} {}
+FsObj::FsObj() : name{""}, offset{0}, length{0}, pos{0}, _end{-1} {}
 
 
-FsObj::FsObj(string name, string content) : name{name}, content{content} {}
+FsObj::FsObj(string name, int offset, int length, int pos, int _end = -1) : name{name}, offset{offset}, length{length}, pos{pos}, _end{_end} {}
 
 
 void FsObj::appendChild(FsObj* child) {
@@ -380,8 +398,37 @@ string FsObj::getName() {
 }
 
 
-string FsObj::getContent() {
-    return this->content;
+ //string FsObj::getContent() {
+     //ifstream file(Wad::path, ios::binary);
+     //file.seekg(this->offset, ios_base::beg);
+     //char* contentBuffer = new char[this->length];
+     //file.read(contentBuffer, this->length);
+ //
+     //stringstream ss;
+ //
+     //for (int i = 0; i < this->length; i++) {
+         //ss << contentBuffer[i];
+     //}
+ //
+     //delete[] contentBuffer;
+ //
+     //return ss.str();
+ //}
+
+int FsObj::getOffset(){
+    return this->offset;
+}
+
+void FsObj::setEnd(int _end){
+    this->_end = _end;
+}
+
+int FsObj::getSize(){
+    return this->length;
+}
+
+int FsObj::getPosition(){
+    return this->pos;
 }
 
 vector<string> FsObj::getChildrenNames() {

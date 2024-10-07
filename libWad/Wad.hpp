@@ -11,28 +11,32 @@ class FsObj{
 
     string name;
     vector<FsObj*> children;
-    string content;
     int offset;
     int length;
+    int pos;
     int _end = -1;
 
     public:
         FsObj();
-        FsObj(string name, string content);
+        FsObj(string name, int offset, int length, int pos, int _end);
+        void setEnd(int _end); // Points to the end of namespace.
         void appendChild(FsObj* child);
         bool isMapDirectory();
         bool isNamespaceDirectory();
         int getNumChildren();
+        int getSize();
+        int getPosition();
+        int getOffset();
         string getName();
-        string getContent();
+        //string getContent();
         vector<string> getChildrenNames();
         vector<FsObj*> getChildren();
 };
 
 class Wad {
 
-    string path; 
     string magic;
+    string path;
     unsigned int descriptorListOffset;
     unsigned int descriptorListLength;
     FsObj* root;
