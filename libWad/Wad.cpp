@@ -13,6 +13,14 @@ regex Wad::namespaceStartPattern("_START$");
 regex Wad::namespaceEndPattern("_END$");
 regex Wad::mapPattern("^E[0-9]M[0-9]$");
 
+Wad::~Wad(){
+    if(this->root != nullptr){
+        this->root->clear();
+        delete this->root;
+        this->root = nullptr;
+    }
+}
+
 // Even though advised against in video, I've decided to load fileContent into memory for simplicity.
 Wad::Wad(const string &path) : path{path}{
 
@@ -56,11 +64,10 @@ Wad::Wad(const string &path) : path{path}{
         file.read((char*)&elementLength, 4);
         file.read(nameBuffer, 8);
         string elementName(nameBuffer, 8);
-        delete[] nameBuffer;
 
-        if (directoryStucture.top()->isMapDirectory() && directoryStucture.top()->getNumChildren() == 10) { 
-            directoryStucture.pop();
-        }
+        string regexCompat(nameBuffer); // Regex do nto work with elementName due to sizing.
+
+        delete[] nameBuffer;
 
         if (regex_search(elementName, Wad::namespaceStartPattern)) // Starting namespace case.
         {
@@ -79,7 +86,7 @@ Wad::Wad(const string &path) : path{path}{
             directoryStucture.pop();
         }
 
-        else if(regex_match(elementName, Wad::mapPattern)) // Matching regex ensures name is proper map directory.
+        else if(regex_match(regexCompat, Wad::mapPattern)) // Matching regex ensures name is proper map directory.
         {
             FsObj* mapDirectory = new FsObj(elementName, elementOffset, elementLength, i);
             directoryStucture.top()->appendChild(mapDirectory);
@@ -91,7 +98,12 @@ Wad::Wad(const string &path) : path{path}{
             FsObj* newFile = new FsObj(elementName, elementOffset, elementLength, i);
 
             directoryStucture.top()->appendChild(newFile);
+
+            if(directoryStucture.top()->getNumChildren() == 10){
+                directoryStucture.pop();
+            }
         }
+
     }
 
     this->root = root;
@@ -223,6 +235,7 @@ string Wad::getMagic() {
 }
 
 bool Wad::isDirectoryFromName(const string &name){
+    cout << "Entered is Directory from name" << endl;
     return regex_match(name, Wad::mapPattern) || regex_search(name, Wad::namespaceStartPattern) || regex_search(name, Wad::namespaceEndPattern);
 }
 
@@ -240,13 +253,17 @@ bool Wad::isDirectory(const string &path) {
 }
 
 bool Wad::isContent(const string &path) {
+    this->root->traverse(true);
+    cout << "PATH ========"<< path << endl;
     if(!isAbsolutePathAndNotEmpty(path)){
+        cout << "Not abs or empty" << endl;
         return false;
     }
 
     FsObj* pathItem = getPathItem(normalizePath(path));
 
     if(pathItem == nullptr){
+        cout << "pathItem not found" << endl;
         return false;
     }
 
@@ -600,6 +617,19 @@ int Wad::writeToFile(const string &path, const char *buffer, int length, int off
     return length;
 }
 
+void FsObj::traverse(bool root, string prev){
+    if(root){
+        prev = "";
+        cout << "/" << "    children: " << this->children.size() << endl;
+    } else{
+        prev = prev + '/' + this->getName();
+        cout << prev << "    children: " << this->children.size() << endl;
+    }
+    for(auto child : this->children){
+        child->traverse(false, prev);
+    }
+}
+
 
 FsObj* Wad::getPathItem(const string &path) {
     vector<string> pathItemNames;
@@ -727,7 +757,6 @@ void FileIO::shift(const string& filename, streamoff offset, streamoff shiftAmou
     file.seekg(0, ios::end);
     streamoff fileSize = file.tellg();
     if (offset >= fileSize) {
-        cout << "Offset is beyond the end of the file." << endl; // Append to the end.
         return;
     }
 
@@ -761,7 +790,6 @@ void FileIO::append(const string &filename, const string &data){
 
     file.close();
     
-    cout << "Data added" << endl;
 }
 
 void FileIO::write(const string &filename, const string &data){
@@ -776,7 +804,6 @@ void FileIO::write(const string &filename, const string &data){
 
     file.close();
     
-    cout << "Data added" << endl;
 }
 
 void FileIO::writeAtLocation(const string& filename, streamoff offset, const string& data) {

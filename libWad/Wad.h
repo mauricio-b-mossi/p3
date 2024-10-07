@@ -33,6 +33,7 @@ class FsObj{
         vector<string> getChildrenNames();
         vector<FsObj*> getChildren();
         void clear();
+        void traverse(bool root = false, string prev = "");
 };
 
 class Wad {
