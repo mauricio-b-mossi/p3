@@ -12,6 +12,9 @@ class FsObj{
     string name;
     vector<FsObj*> children;
     string content;
+    int offset;
+    int length;
+    int _end = -1;
 
     public:
         FsObj();
@@ -30,9 +33,15 @@ class Wad {
 
     string path; 
     string magic;
+    unsigned int descriptorListOffset;
+    unsigned int descriptorListLength;
     FsObj* root;
     FsObj* getPathItem(const string &path);
     bool isDirectoryFromName(const string &name);
+    vector<string> parsePath(const string &path);
+    string normalizePath(const string &path);
+    bool isAbsolutePathAndNotEmpty(const string &path);
+    int getInsertionPosition(const string &path);
 
     public:
         Wad(const string &path);
@@ -48,4 +57,8 @@ class Wad {
         int getSize(const string &path);
         int getContents(const string &path, char *buffer, int length, int offset);
         int getDirectory(const string &path, vector<string> *directory);
+
+        void createDirectory(const string &path);
+        void createFile(const string &path);
+        int writeToFile(const string &path, const char *buffer, int length, int offset);
 };

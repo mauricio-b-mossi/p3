@@ -37,6 +37,8 @@ Wad::Wad(const string &path) : path{path}{
     file.read((char*)&descriptorListOffset, 4);
 
     this->magic = string(magic, 4);
+    this->descriptorListOffset = descriptorListOffset;
+    this->descriptorListLength = descriptorsListLength;
 
     stack<FsObj*> directoryStucture;
     FsObj* root = new FsObj();
@@ -59,30 +61,9 @@ Wad::Wad(const string &path) : path{path}{
             directoryStucture.pop();
         }
 
-        if (elementLength != 0) // defenitely file case, since by convention we make directories 0 length, however files might be 0 length!
-        {
-            file.seekg(elementOffset, ios_base::beg);
-            char* contentBuffer = new char[elementLength];
-            file.read(contentBuffer, elementLength);
-
-            stringstream ss;
-
-            for (int i = 0; i < elementLength; i++) {
-                ss << contentBuffer[i];
-            }
-
-            delete[] contentBuffer;
-
-            auto fileContent = ss.str();
-
-            FsObj* newFile = new FsObj(elementName, fileContent);
-
-            directoryStucture.top()->appendChild(newFile);
-        } 
-
         else if (regex_search(elementName, Wad::namespaceStartPattern)) // Starting namespace case.
         {
-            auto markerStart = elementName.find("_START");
+            auto markerStart = elementName.find("_START"); // I know this wont fail by regex.
             auto namespaceDirectoryName = elementName.substr(0, markerStart);
             FsObj* namespaceDirectory = new FsObj(namespaceDirectoryName, "");
 
@@ -103,15 +84,64 @@ Wad::Wad(const string &path) : path{path}{
             directoryStucture.push(mapDirectory);
         }
 
-        else
+        else // If not any of the above, then it is file, might be file of length 0.
         {
-            throw std::runtime_error("File/Directory type not recognized. Might be empty file. Or invalid directory");
+            file.seekg(elementOffset, ios_base::beg);
+            char* contentBuffer = new char[elementLength];
+            file.read(contentBuffer, elementLength);
+
+            stringstream ss;
+
+            for (int i = 0; i < elementLength; i++) {
+                ss << contentBuffer[i];
+            }
+
+            delete[] contentBuffer;
+
+            auto fileContent = ss.str();
+
+            FsObj* newFile = new FsObj(elementName, fileContent);
+
+            directoryStucture.top()->appendChild(newFile);
         }
     }
 
     this->root = root;
 
     file.close();
+} 
+
+vector<string> Wad::parsePath(const string& path) {
+    vector<string> parts;
+    stringstream ss(path);
+    string part;
+
+    if (!path.empty() && path[0] == '/') { // Adding root.
+        parts.push_back("/");
+    }
+
+    while (getline(ss, part, '/')) { // Split the rest normally, removing trailing /.
+        if (!part.empty()) { 
+            parts.push_back(part);
+        }
+    }
+
+    return parts;
+}
+
+string Wad::normalizePath(const string &path) // Normalizes path by removing trailing slashes.
+{ 
+    if (path == "/" || path.empty()) {
+        return path;
+    }
+
+    size_t end = path.find_last_not_of('/');
+    return path.substr(0, end + 1);
+}
+
+bool Wad::isAbsolutePathAndNotEmpty(const string &path)
+{
+    return path.size() > 0 && path.at(0) == '/';
 }
 
 // Could cause errors.
@@ -129,7 +159,10 @@ bool Wad::isDirectoryFromName(const string &name){
 }
 
 bool Wad::isDirectory(const string &path) {
-    FsObj* pathItem = getPathItem(path);
+    if(!isAbsolutePathAndNotEmpty(path)){
+        return false;
+    }
+    FsObj* pathItem = getPathItem(normalizePath(path));
 
     if(pathItem == nullptr){
         return false;
@@ -139,8 +172,11 @@ bool Wad::isDirectory(const string &path) {
 }
 
 bool Wad::isContent(const string &path) {
+    if(!isAbsolutePathAndNotEmpty(path)){
+        return false;
+    }
 
-    FsObj* pathItem = getPathItem(path);
+    FsObj* pathItem = getPathItem(normalizePath(path));
 
     if(pathItem == nullptr){
         return false;
@@ -151,8 +187,11 @@ bool Wad::isContent(const string &path) {
 
 
 int Wad::getSize(const string &path) {
+    if(!isAbsolutePathAndNotEmpty(path)){
+        return -1;
+    }
 
-    FsObj* pathItem = getPathItem(path);
+    FsObj* pathItem = getPathItem(normalizePath(path));
 
     if (pathItem == nullptr){
         return -1;
@@ -167,7 +206,11 @@ int Wad::getSize(const string &path) {
 
 
 int Wad::getContents(const string &path, char *buffer, int length, int offset = 0) {
-    FsObj* pathItem = getPathItem(path);
+    if(!isAbsolutePathAndNotEmpty(path)){
+        return -1;
+    }
+
+    FsObj* pathItem = getPathItem(normalizePath(path));
 
     if (pathItem == nullptr){
         return -1;
@@ -191,12 +234,16 @@ int Wad::getContents(const string &path, char *buffer, int length, int offset = 
         buffer[i] = content.at(i);
     }
 
-    return length;
+    return content.size(); // Double check.
 }
 
 
 int Wad::getDirectory(const string &path, vector<string> *directory) {
-    FsObj* pathItem = getPathItem(path);
+    if(!isAbsolutePathAndNotEmpty(path)){
+        return -1;
+    }
+
+    FsObj* pathItem = getPathItem(normalizePath(path));
 
     if (pathItem == nullptr){
        return -1; 
@@ -211,6 +258,56 @@ int Wad::getDirectory(const string &path, vector<string> *directory) {
     }
     
     return pathItem->getNumChildren();
+}
+
+void Wad::createDirectory(const string &path){
+    if(!isAbsolutePathAndNotEmpty(path)){
+        return;
+    }
+
+    FsObj* pathItem = getPathItem(normalizePath(path));
+    
+    if(pathItem != nullptr){ // Directory already exists
+        return;
+    }
+
+    // Directory does not exist. Check if length is 2
+    vector<string> parsedPath = parsePath(path);
+
+    if(parsedPath.size() < 2){ // just contains "/"
+        return;
+    }
+
+    if(parsedPath.back().length() > 2){ // name does not fit 2 char constraint.
+        return;
+    }
+
+    // check if parent valid, exists and not map or file.
+    size_t pos = path.rfind(parsedPath.back());
+
+    string parent;
+
+    if (pos != std::string::npos) {
+        parent = normalizePath(path.substr(0, pos));
+    }
+
+    if(parent.empty()){
+        return;
+    }
+
+    pathItem = getPathItem(parent);
+
+    if(pathItem )
+
+    // valid insertion. Search position insert 32 bytes.
+}
+
+void Wad::createFile(const string &path){
+    return;
+}
+
+int Wad::writeToFile(const string &path, const char *buffer, int length, int offset = 0){
+    return 0;
 }
 
 FsObj* Wad::getPathItem(const string &path) {
@@ -287,7 +384,6 @@ string FsObj::getContent() {
     return this->content;
 }
 
-
 vector<string> FsObj::getChildrenNames() {
     vector<string> childrenNames;
 
@@ -297,7 +393,6 @@ vector<string> FsObj::getChildrenNames() {
 
     return childrenNames;
 }
-
 
 vector<FsObj*> FsObj::getChildren() {
     return this->children;
