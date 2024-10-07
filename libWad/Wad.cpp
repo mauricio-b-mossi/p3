@@ -269,7 +269,7 @@ int Wad::getSize(const string &path) {
         return -1;
     }
 
-    return pathItem->getSize(); // If file of 0 length?
+    return pathItem->getLength(); // If file of 0 length?
 }
 
 
@@ -288,18 +288,18 @@ int Wad::getContents(const string &path, char *buffer, int length, int offset = 
         return -1;
     }
 
-    if(offset >= pathItem->getSize()){
+    if(offset >= pathItem->getLength()){
         return 0;
     }
 
-    if (length > pathItem->getSize()) {
-        length = pathItem->getSize();
+    if (length > pathItem->getLength()) {
+        length = pathItem->getLength();
     }
 
     ifstream file(this->path, ios::binary);
     file.seekg(pathItem->getOffset() + offset, ios_base::beg);
 
-    auto effectiveLength = pathItem->getSize() - offset;
+    auto effectiveLength = pathItem->getLength() - offset;
 
     char* contentBuffer = new char[effectiveLength];
     file.read(contentBuffer, effectiveLength);
@@ -408,6 +408,8 @@ void Wad::createDirectory(const string &path){
 
         FileIO::append(this->path, startFd.toString());
         FileIO::append(this->path, endFd.toString());
+
+        this->reloadWad();
     }
     else if(pathItem->isNamespaceDirectory())
     {
@@ -432,15 +434,18 @@ void Wad::createDirectory(const string &path){
         FileIO::shift(this->path, effectiveOffset, 32);
         FileIO::writeAtLocation(this->path, effectiveOffset, startFd.toString());
         FileIO::writeAtLocation(this->path, effectiveOffset + 16, endFd.toString());
+
+        this->reloadWad();
     }
 }
 
 void Wad::createFile(const string &path){
-    if(path.back() == '/'){
+
+    if(!isAbsolutePathAndNotEmpty(path)){
         return;
     }
 
-    if(!isAbsolutePathAndNotEmpty(path)){
+    if(path.back() == '/'){
         return;
     }
 
@@ -459,7 +464,8 @@ void Wad::createFile(const string &path){
 
     string fileName = parsedPath.back();
 
-    if(fileName.length() > 8){ // name does not fit 8 char constraint.
+    // checkfileName is valid
+    if(fileName.length() > 8 || isDirectoryFromName(fileName)){ // name does not fit 8 char constraint or isDirectory.
         return;
     }
 
@@ -500,6 +506,8 @@ void Wad::createFile(const string &path){
         fileFd.createFileDescriptor(0, 0, fileName);
 
         FileIO::append(this->path, fileFd.toString());
+
+        this->reloadWad();
     }
     else if(pathItem->isNamespaceDirectory())
     {
@@ -521,10 +529,72 @@ void Wad::createFile(const string &path){
 
         FileIO::shift(this->path, effectiveOffset, 16);
         FileIO::writeAtLocation(this->path, effectiveOffset, fileFd.toString());
+
+        this->reloadWad();
     }
 }
 
 int Wad::writeToFile(const string &path, const char *buffer, int length, int offset = 0){
+    if(!isAbsolutePathAndNotEmpty(path)){
+        return -1;
+    }
+
+    if(path.back() == '/'){
+        return -1;
+    }
+
+    FsObj* pathItem = getPathItem(path);
+    
+    if(pathItem == nullptr){ // File does NOT exists
+        return -1;
+    }
+
+    vector<string> parsedPath = parsePath(path); 
+
+    if(parsedPath.size() < 2){ // just contains "/"
+        return -1;
+    }
+
+    string fileName = parsedPath.back();
+
+    if(fileName.length() > 8 || isDirectoryFromName(fileName)){ // name does not fit 8 char constraint or isDirectory.
+        return -1;
+    }
+
+    if(pathItem->getLength() > 0){ // Non empty case.
+        return 0;
+    }
+
+    // Valid, not directory, empty, and valid.
+    // Get offsetList, shift by length, updata offsetLength, update file offset and length.
+
+    // Modifying files offset and length.
+    ostringstream oss;
+    
+    unsigned int ulength = length;
+    oss.write(reinterpret_cast<const char*>(&this->descriptorListOffset), sizeof(this->descriptorListOffset));
+    oss.write(reinterpret_cast<const char*>(&ulength), sizeof(ulength));
+
+    string result = oss.str();
+
+    auto effectiveOffset = pathItem->getPosition() * 16 + this->descriptorListOffset;
+    FileIO::writeAtLocation(this->path, effectiveOffset, result);
+
+    // Now shift and write at offset.
+    FileIO::shift(this->path, this->descriptorListOffset, length);
+    FileIO::writeAtLocation(this->path, this->descriptorListOffset, string(buffer, length));
+
+    oss.str("");
+    oss.clear();
+    
+    unsigned int newDescriptorListOffset = ulength + this->descriptorListOffset;
+    oss.write(reinterpret_cast<const char*>(&newDescriptorListOffset), sizeof(newDescriptorListOffset));
+
+    string result = oss.str();
+
+    // Now change header
+    FileIO::writeAtLocation(this->path, 8, result);
+
     return 0;
 }
 
@@ -602,6 +672,9 @@ int FsObj::getNumChildren() {
     return this->children.size();
 }
 
+int FsObj::getLength(){
+    return this->length;
+}
 
 string FsObj::getName() {
     return this->name;
@@ -617,10 +690,6 @@ int FsObj::getOffset(){
 
 void FsObj::setEnd(int _end){
     this->_end = _end;
-}
-
-int FsObj::getSize(){
-    return this->length;
 }
 
 int FsObj::getPosition(){
