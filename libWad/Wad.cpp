@@ -595,7 +595,9 @@ int Wad::writeToFile(const string &path, const char *buffer, int length, int off
     // Now change header
     FileIO::writeAtLocation(this->path, 8, result);
 
-    return 0;
+    this->reloadWad();
+
+    return length;
 }
 
 
