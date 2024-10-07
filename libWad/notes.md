@@ -21,4 +21,3 @@
     - Namespace: 2 byte length, name is suffixed by "_START", children are enclosed in "name_START" "name_END".
 
 > You can only create namespace dirs!
-
