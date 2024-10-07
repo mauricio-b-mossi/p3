@@ -110,8 +110,8 @@ Wad::Wad(const string &path) : path{path}{
 
     file.close();
 
-    cout << "Load =========" << endl;
     this->root->traverse(true);
+
 } 
 
 // Could cause errors.
@@ -203,7 +203,7 @@ void Wad::reloadWad(){
     }
 
     file.close();
-    cout << "Reload =========" << endl;
+
     this->root->traverse(true);
 }
 
