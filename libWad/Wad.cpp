@@ -407,11 +407,31 @@ void Wad::createDirectory(const string &path){
         endFd.createFileDescriptor(0, 0, directoryName + "_END");
 
         FileIO::append(this->path, startFd.toString());
-        FileIO::append(this->path, startFd.toString());
+        FileIO::append(this->path, endFd.toString());
     }
     else if(pathItem->isNamespaceDirectory())
     {
-        // namespace.end
+        this->descriptorListLength += 2;
+
+        ostringstream oss;
+        
+        oss.write(reinterpret_cast<const char*>(&this->descriptorListLength), sizeof(this->descriptorListLength));
+
+        string result = oss.str();
+
+        FileIO::writeAtLocation(this->path, 4, result);
+
+        FileDescriptor startFd;
+        FileDescriptor endFd;
+
+        startFd.createFileDescriptor(0, 0, directoryName + "_START");
+        endFd.createFileDescriptor(0, 0, directoryName + "_END");
+
+        auto effectiveOffset = pathItem->getEnd() * 16 + this->descriptorListOffset;
+
+        FileIO::shift(this->path, effectiveOffset, 32);
+        FileIO::writeAtLocation(this->path, effectiveOffset, startFd.toString());
+        FileIO::writeAtLocation(this->path, effectiveOffset + 16, endFd.toString());
     }
 
 
