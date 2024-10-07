@@ -110,8 +110,6 @@ Wad::Wad(const string &path) : path{path}{
 
     file.close();
 
-    this->root->traverse(true);
-
 } 
 
 // Could cause errors.
@@ -204,7 +202,6 @@ void Wad::reloadWad(){
 
     file.close();
 
-    this->root->traverse(true);
 }
 
 vector<string> Wad::parsePath(const string& path) {
@@ -492,6 +489,7 @@ void Wad::createFile(const string &path){
 
     string fileName = parsedPath.back();
 
+
     // checkfileName is valid
     if(fileName.length() > 8 || isDirectoryFromName(fileName)){ // name does not fit 8 char constraint or isDirectory.
         return;
@@ -536,6 +534,7 @@ void Wad::createFile(const string &path){
         FileIO::append(this->path, fileFd.toString());
 
         this->reloadWad();
+        this->reloadWad();
     }
     else if(pathItem->isNamespaceDirectory())
     {
@@ -558,6 +557,7 @@ void Wad::createFile(const string &path){
         FileIO::shift(this->path, effectiveOffset, 16);
         FileIO::writeAtLocation(this->path, effectiveOffset, fileFd.toString());
 
+        this->reloadWad(); // Need to reload twice, don't know why.
         this->reloadWad();
     }
 }
@@ -657,7 +657,6 @@ FsObj* Wad::getPathItem(const string &path) {
     while (getline(ss, nameBuffer, '/')) { // Break into pathItemNames
         pathItemNames.push_back(nameBuffer);
     }
-
 
     // going to use curr as pointer to traverse structure. Will return curr as a pointer
     // to final destination.
