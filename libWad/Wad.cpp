@@ -273,7 +273,7 @@ int Wad::getSize(const string &path) {
 }
 
 
-int Wad::getContents(const string &path, char *buffer, int length, int offset = 0) {
+int Wad::getContents(const string &path, char *buffer, int length, int offset) {
     if(!isAbsolutePathAndNotEmpty(path)){
         return -1;
     }
@@ -534,7 +534,7 @@ void Wad::createFile(const string &path){
     }
 }
 
-int Wad::writeToFile(const string &path, const char *buffer, int length, int offset = 0){
+int Wad::writeToFile(const string &path, const char *buffer, int length, int offset){
     if(!isAbsolutePathAndNotEmpty(path)){
         return -1;
     }
