@@ -363,6 +363,7 @@ void Wad::createDirectory(const string &path){
     }
 
     string directoryName = parsedPath.back();
+
     if(directoryName.length() > 2){ // name does not fit 2 char constraint.
         return;
     }
@@ -389,7 +390,24 @@ void Wad::createDirectory(const string &path){
     // Insert either on "/" or namespace.
     if(pathItem->getName() == "/")
     {
-        //(pathItem->getChildren().back()->getPosition() + 1) * 16
+        this->descriptorListLength += 2;
+
+        ostringstream oss;
+        
+        oss.write(reinterpret_cast<const char*>(&this->descriptorListLength), sizeof(this->descriptorListLength));
+
+        string result = oss.str();
+
+        FileIO::writeAtLocation(this->path, 4, result);
+
+        FileDescriptor startFd;
+        FileDescriptor endFd;
+
+        startFd.createFileDescriptor(0, 0, directoryName + "_START");
+        endFd.createFileDescriptor(0, 0, directoryName + "_END");
+
+        FileIO::append(this->path, startFd.toString());
+        FileIO::append(this->path, startFd.toString());
     }
     else if(pathItem->isNamespaceDirectory())
     {
