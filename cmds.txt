@@ -1,2 +1,6 @@
 fusermount -u ./mount
 ./wadfs/wadfs -s files/sample1_test.wad ./mount
+
+tar -zxvf ./P3_LibraryTestSuite.tgz
+sudo chmod +x ./run_libtest.sh
+sudo ./run_libtest.sh
