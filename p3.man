@@ -1,0 +1,286 @@
+.TH PROJECT 3 "November 2024" "Version 1.0" "Project Manual"
+
+.SH NAME
+P3 - File Systems
+
+.SH SYNOPSIS
+The goal of this project to implement a WAD filesystem. 
+The FUSE library was used to create the deamon and interface with the WAD filesystem.
+
+.SH DESCRIPTION
+.SS libWad
+The Wad class implements the methods in the specification and has been extended to facilitate
+development. The data structure used to represent the WAD filesystem is an nary-tree. 
+Each instance of Wad contains the head of the nary-tree as a root member of type FsObj*.
+The FsObj class represents a node in the nary-tree. As its data attributes it contains the node's:  
+
+.IP
+- name: The display name in output.
+.IP
+- fullname: The 8 byte name, as shown in the .wad file.
+.IP
+- children: Vector of FsObj pointers.
+.IP
+- offset: Content offset in .wad file.
+.IP
+- length: Content length in .wad file.
+.IP
+- pos: File descriptor index in file descriptor list.
+.IP
+- _end: Points to _END file descriptor for _START node.
+
+.PP
+On Wad::loadWad the root is initialized and the structure is built.
+.PP
+The FileIO class abstracts common file operations: shift, append, write, writeAtLocation.
+.PP
+The FileDescriptor class constructs 16 byte representation of the files.
+
+.SS Wad
+.PP
+Wad(const string &path);
+.RS
+.IP
+Cannot be called directly. Reads the contents of a .wad file and sets the root member, magic, descriptorListOffset and descriptorListLength.
+To build the nary-tree, a stack is used to keep track of the directory structure. When a directory is read, it is pushed to the stack.
+Regex is used to determine directory type. Per each file descriptor a new FsObj is contructed and set as the child of the item on the stack.
+.sp
+.RE
+
+.PP
+static Wad* loadWad(const string &path);
+.RS
+.IP
+Calls Wad::Wad and returns pointer to instance.
+.sp
+.RE
+
+.PP
+FsObj* getPathItem(const string &path);
+.RS
+.IP
+Starting from root, traverses and returns the FsObj pointed by the path.
+.sp
+.RE
+
+.PP
+bool isDirectory(const string &path);
+.RS
+.IP
+Checks for path validity then uses Wad::getPathItem and calls FsObj::isDirectory for that node.
+.sp
+.RE
+
+.PP
+bool isContent(const string &path);
+.RS
+.IP
+Negation of Wad::isDirectory.
+.sp
+.RE
+
+.PP
+int getSize(const string &path);
+.RS
+.IP
+Uses Wad::getPathItem and calls FsObj::getLength for that node.
+.sp
+.RE
+
+.PP
+int getContents(const string &path, char *buffer, int length, int offset);
+.RS
+.IP
+Uses Wad::getPathItem to get node's offset and length information. Performs basic checks. Reads contents to buffer. Returns content size.
+.sp
+.RE
+
+.PP
+int getDirectory(const string &path, vector<string> *directory);
+.RS
+.IP
+Uses Wad::getPathItem to get node. Fills *directory with node's children.
+.sp
+.RE        
+
+.PP
+void createDirectory(const string &path);
+.RS
+.IP
+Normalizes path. Checks for directory exitance.If directory does not exists and 
+name is valid, tokenizes path and searches for parent directory.
+If parent directoy is root or namespace directory it creates a file
+descriptor and writes the changes to the wad filesystem. Updates header accordingly.
+If successful, uses Wad::reloadWad to rebuild structure from .wad file. 
+.sp
+.RE        
+
+.PP
+void createFile(const string &path);
+.RS
+.IP
+Normalizes path. If name is valid, tokenizes path and searches
+for parent directory. If parent directoy is root or namespace directory,
+it creates a file descriptor and writes the changes to the wad filesystem. 
+Updates header accordingly. If successful, uses Wad::reloadWad to rebuild structure from .wad file. 
+.sp
+.RE        
+
+.PP
+int writeToFile(const string &path, const char *buffer, int length, int offset = 0);
+.RS
+.IP
+Normalizes path. Checks for name validity of new file's name.
+If name is valid and file is emtpy. It shifts descriptorListOffset by 
+the length and writes contents. Updates header accordingly. If successful, 
+uses Wad::reloadWad to rebuild structure from .wad file. 
+.sp
+.RE        
+
+.SS FsObj
+.PP
+FsObj(const string &name, const string &fullname, int offset, int length, int pos);
+.RS
+.IP
+FsObj constructor, has default constructor also.
+.sp
+.RE
+
+.PP
+void appendChild(FsObj* child);
+.RS
+.IP
+Appends child to nodes children vector.
+.sp
+.RE
+
+.PP
+bool isDirectory();
+.RS
+.IP
+Uses both name and fullname agains regex to determine by name if the node is a directory.
+.sp
+.RE
+
+.PP
+void setEnd(int _end);
+.RS
+.IP
+Sets namespace _START node's _end member to the index of _END in descriptor list.
+_end is used to position items before _END on item creation since no FsObj is created
+per _END.
+.sp
+.RE
+
+.PP
+void clear();
+.RS
+.IP
+Frees memory of all decendants of the node.
+.sp
+.RE
+
+.PP
+void clearChildren();
+.RS
+.IP
+Used on Wad::reload to clear root's children vector after root->clear.
+.sp
+.RE
+
+.PP
+void traverse(bool root = false, string prev = "");
+.RS
+.IP
+Used for debugging. Prints the directory structure from node with respect 
+to its decendants.
+.sp
+.RE
+
+
+.TP
+.B
+FSObj contains getters for all properties mentioned above.
+
+.SS wadfs
+Initializes deamon and implements the getattr, mknod, mkdir, read, write, readdir fuse_operations.
+All implementation methods use fuse_get_context()->private_data to access Wad instance created on
+deamon initialization.
+
+.PP
+static int wad_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info *info);
+.RS
+.IP
+Implements .write. Passes all arguments to Wad::writeToFile.
+.sp
+.RE
+
+.PP
+static int wad_mknod(const char *path, mode_t mode, dev_t rdev);
+.RS
+.IP
+Implements .mknod. Passes path to Wad::createFile.
+.sp
+.RE
+
+.PP
+static int wad_mkdir(const char *path, mode_t mode);
+.RS
+.IP
+Implements .mkdir. Passes path to Wad::createDirectory;
+.sp
+.RE
+
+.PP
+static int wad_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
+.RS
+.IP
+Implements .readdir. Fills buffer with parent and current directory. Passes path to
+Wad::getDirectory and uses the method to retrive the children for the given path. Fills 
+buffer with children name's.
+.sp
+.RE
+
+.PP
+static int wad_read(const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *fi);
+.RS
+.IP
+Implements .read. Passes all arguments to Wad::getContents.
+.sp
+.RE
+
+.PP
+static int wad_getattr(const char *path, struct stat *stbuf);
+.RS
+.IP
+Checks if path is a file or a directory. Sets the file descriptor type, link, time, and size accordingly. 
+Grants full permission to each by appending 0777 flag.
+.sp
+.RE
+
+.PP
+.SH TESTING
+.IP
+Testing was perform both manually and with an automated test suite. Manual testing 
+consisted on using the debugger to step through code.
+Automated testing consisted of a using a makefile that ran all the  proper "untars"
+and "unzips" along side the tests provided. This 
+was done as to simulate how the deliverables were going to be tested. 
+.sp
+
+.SH BUGS
+.IP
+None
+
+.SH LINK
+.IP
+https://youtu.be/0om50ldddLU
+
+.SH REFERENCES/CITATIONS
+.IP    
+Learncpp  https://www.learncpp.com/cpp-tutorial/bitwise-operators/
+P2 Spring 2024 - Ernesto M - https://youtu.be/8v67sIrBlW0?si=ne_Z62DKtLGoSrcJ
+
+.SH AUTHOR
+.IP
+Mauricio Mossi 91969681

@@ -91,7 +91,6 @@ struct FileDescriptor {
     unsigned int elementOffset;
     unsigned int elementLength;
     char nameBuffer[8]; // To hold the name exactly 8 bytes
-    string name;
 
     bool createFileDescriptor(unsigned int elementOffset, unsigned int elementLength, const string &name);
 
