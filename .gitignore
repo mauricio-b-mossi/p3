@@ -3,5 +3,5 @@
 test-workspace/
 *.a
 libtest.cpp
-*.sh
+run_libtest.sh
 /wadfs/wadfs
