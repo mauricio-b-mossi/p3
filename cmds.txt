@@ -1,0 +1,2 @@
+fusermount -u ./mount
+./wadfs/wadfs -s files/sample1_test.wad ./mount

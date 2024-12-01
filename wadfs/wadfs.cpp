@@ -5,47 +5,51 @@
 #include <vector>
 #include <unistd.h>
 #include <cstring>
+#include <sys/stat.h>
 
 using namespace std;
 
+// Not setting permissions
 static int wad_getattr(const char *path, struct stat *stbuf) {
 
     auto wad = ((Wad*)fuse_get_context()->private_data);
 
     memset(stbuf, 0, sizeof(struct stat));
 
-    if(wad->isDirectory(path)) {
-        stbuf->st_mode = S_IFDIR | 0555;
-        stbuf->st_nlink = 2;
-        return 0;
-    }
+	stbuf->st_uid = getuid(); // The owner of the file/directory is the user who mounted the filesystem
+	stbuf->st_gid = getgid(); // The group of the file/directory is the same as the group of the user who mounted the filesystem
+	stbuf->st_atime = time( NULL ); // The last "a"ccess of the file/directory is right now
+	stbuf->st_mtime = time( NULL ); // The last "m"odification of the file/directory is right now
 
-    if (wad->isContent(path)) {
-        stbuf->st_mode = S_IFREG | 0444;
-        stbuf->st_nlink = 1;
+    if(wad->isDirectory(path) || strcmp(path, "/") == 0) {
+        stbuf->st_mode = S_IFDIR | 0777; // drwxrwxrwx
+        stbuf->st_nlink = 2; // Directories have at least two links
+    }
+    else if (wad->isContent(path)) {
+     stbuf->st_mode = S_IFREG | 0777; // -rwxrwxrwx
+        stbuf->st_nlink = 1; // Regular files have one link
         stbuf->st_size = wad->getSize(path);
-        return 0;
+    }
+    else{
+        return -ENOENT;
     }
 
-    return -ENOENT;
-}
-
-static int wad_open(const char *path, struct fuse_file_info *fi) {
     return 0;
 }
 
+// Working
 static int wad_read(const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *fi) {
     auto wad = ((Wad*)fuse_get_context()->private_data);
     return wad->getContents(path, buffer, size, offset);
 }
 
+// Working
 static int wad_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
     auto wad = ((Wad*)fuse_get_context()->private_data);
 
     filler(buffer, ".", NULL, 0); // Filling buffer with standard Curr and Parent Dir.
     filler(buffer, "..", NULL, 0);
 
-    // fill children names
     vector<string> childrenNames;
     wad->getDirectory(path, &childrenNames);
 
@@ -56,6 +60,7 @@ static int wad_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, o
     return 0;
 }
 
+// Working
 static int wad_mkdir(const char *path, mode_t mode)
 {
     auto wad = ((Wad*)fuse_get_context()->private_data);
@@ -64,6 +69,7 @@ static int wad_mkdir(const char *path, mode_t mode)
 	return 0;
 }
 
+// Working
 static int wad_mknod(const char *path, mode_t mode, dev_t rdev)
 {
     auto wad = ((Wad*)fuse_get_context()->private_data);
@@ -75,9 +81,7 @@ static int wad_mknod(const char *path, mode_t mode, dev_t rdev)
 static int wad_write(const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info *info )
 {
     auto wad = ((Wad*)fuse_get_context()->private_data);
-    wad->writeToFile(path, buffer, size, offset);
-	
-	return 0;
+    return wad->writeToFile(path, buffer, size, offset);
 }
 
 static struct fuse_operations wad_operations = {
@@ -118,6 +122,10 @@ int main(int argc, char* argv[]){
     argc--;
 
     //((Wad*)fuse_get_context()->private_data)
-    return fuse_main(argc, argv, &wad_operations, myWad);
+    fuse_main(argc, argv, &wad_operations, myWad);
+
+    delete myWad;
+
+    return 0;
 
 }

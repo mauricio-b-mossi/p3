@@ -1,1 +1,6 @@
 *.json
+*.o
+test-workspace/
+*.a
+libtest.cpp
+*.sh
