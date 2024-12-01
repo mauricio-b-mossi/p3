@@ -261,11 +261,9 @@ Grants full permission to each by appending 0777 flag.
 .PP
 .SH TESTING
 .IP
-Testing was perform both manually and with an automated test suite. Manual testing 
-consisted on using the debugger to step through code.
-Automated testing consisted of a using a makefile that ran all the  proper "untars"
-and "unzips" along side the tests provided. This 
-was done as to simulate how the deliverables were going to be tested. 
+Testing was performed both manually and automatically with the test suite provided. A additional 
+shell script was built to ensure correct packing and unpacking of deliverable. The script
+runs the exact commands specified on the document and then runs test suite provided.
 .sp
 
 .SH BUGS
@@ -274,12 +272,14 @@ None
 
 .SH LINK
 .IP
-https://youtu.be/0om50ldddLU
 
 .SH REFERENCES/CITATIONS
 .IP    
-Learncpp  https://www.learncpp.com/cpp-tutorial/bitwise-operators/
-P2 Spring 2024 - Ernesto M - https://youtu.be/8v67sIrBlW0?si=ne_Z62DKtLGoSrcJ
+CS137 FUSE Documentation - https://www.cs.hmc.edu/~geoff/classes/hmc.cs137.201601/homework/fuse/fuse_doc.html
+.IP
+Writing Less Simple, Yet Stupid Filesystem Using Fuse in C - https://maastaar.net/fuse/linux/filesystem/c/2019/09/28/writing-less-simple-yet-stupid-filesystem-using-FUSE-in-C/
+.IP
+P3 Discussion - Ernesto M - https://youtu.be/Fnfflm3_9kw?si=ttgXr6x2qpDXXv6n
 
 .SH AUTHOR
 .IP
