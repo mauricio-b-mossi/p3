@@ -18,8 +18,8 @@ static int wad_getattr(const char *path, struct stat *stbuf) {
 
 	stbuf->st_uid = getuid(); // The owner of the file/directory is the user who mounted the filesystem
 	stbuf->st_gid = getgid(); // The group of the file/directory is the same as the group of the user who mounted the filesystem
-	stbuf->st_atime = time( NULL ); // The last access of the file/directory is right now
-	stbuf->st_mtime = time( NULL ); // The last modification of the file/directory is right now
+	stbuf->st_atime = time( NULL ); // The last "a"ccess of the file/directory is right now
+	stbuf->st_mtime = time( NULL ); // The last "m"odification of the file/directory is right now
 
     if(wad->isDirectory(path) || strcmp(path, "/") == 0) {
         stbuf->st_mode = S_IFDIR | 0777; // drwxrwxrwx

@@ -1,5 +1,14 @@
+mkdir mount
+./wadfs/wadfs -s files/sample1_test.wad ./mount
+ls -al
+mkdir ee
+nano hi.txt
+cd E1M0
+ls -al
 fusermount -u ./mount
 ./wadfs/wadfs -s files/sample1_test.wad ./mount
+ls -al
+cp Gl/ad/os/cake.jpg ../HERE.jpg
 
 tar -zxvf ./P3_LibraryTestSuite.tgz
 sudo chmod +x ./run_libtest.sh
